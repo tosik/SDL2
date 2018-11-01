@@ -136,7 +136,46 @@ typedef enum SDL_MetalFragmentFunction
     SDL_METAL_FRAGMENT_YUV,
     SDL_METAL_FRAGMENT_NV12,
     SDL_METAL_FRAGMENT_NV21,
-    SDL_METAL_FRAGMENT_SPECIFIED,
+    SDL_METAL_FRAGMENT_SPECIFIED_0,
+    SDL_METAL_FRAGMENT_SPECIFIED_1,
+    SDL_METAL_FRAGMENT_SPECIFIED_2,
+    SDL_METAL_FRAGMENT_SPECIFIED_3,
+    SDL_METAL_FRAGMENT_SPECIFIED_4,
+    SDL_METAL_FRAGMENT_SPECIFIED_5,
+    SDL_METAL_FRAGMENT_SPECIFIED_6,
+    SDL_METAL_FRAGMENT_SPECIFIED_7,
+    SDL_METAL_FRAGMENT_SPECIFIED_8,
+    SDL_METAL_FRAGMENT_SPECIFIED_9,
+    SDL_METAL_FRAGMENT_SPECIFIED_10,
+    SDL_METAL_FRAGMENT_SPECIFIED_11,
+    SDL_METAL_FRAGMENT_SPECIFIED_12,
+    SDL_METAL_FRAGMENT_SPECIFIED_13,
+    SDL_METAL_FRAGMENT_SPECIFIED_14,
+    SDL_METAL_FRAGMENT_SPECIFIED_15,
+    SDL_METAL_FRAGMENT_SPECIFIED_16,
+    SDL_METAL_FRAGMENT_SPECIFIED_17,
+    SDL_METAL_FRAGMENT_SPECIFIED_18,
+    SDL_METAL_FRAGMENT_SPECIFIED_19,
+    SDL_METAL_FRAGMENT_SPECIFIED_20,
+    SDL_METAL_FRAGMENT_SPECIFIED_21,
+    SDL_METAL_FRAGMENT_SPECIFIED_22,
+    SDL_METAL_FRAGMENT_SPECIFIED_23,
+    SDL_METAL_FRAGMENT_SPECIFIED_24,
+    SDL_METAL_FRAGMENT_SPECIFIED_25,
+    SDL_METAL_FRAGMENT_SPECIFIED_26,
+    SDL_METAL_FRAGMENT_SPECIFIED_27,
+    SDL_METAL_FRAGMENT_SPECIFIED_28,
+    SDL_METAL_FRAGMENT_SPECIFIED_29,
+    SDL_METAL_FRAGMENT_SPECIFIED_30,
+    SDL_METAL_FRAGMENT_SPECIFIED_31,
+    SDL_METAL_FRAGMENT_SPECIFIED_32,
+    SDL_METAL_FRAGMENT_SPECIFIED_33,
+    SDL_METAL_FRAGMENT_SPECIFIED_34,
+    SDL_METAL_FRAGMENT_SPECIFIED_35,
+    SDL_METAL_FRAGMENT_SPECIFIED_36,
+    SDL_METAL_FRAGMENT_SPECIFIED_37,
+    SDL_METAL_FRAGMENT_SPECIFIED_38,
+    SDL_METAL_FRAGMENT_SPECIFIED_39,
     SDL_METAL_FRAGMENT_COUNT,
 } SDL_MetalFragmentFunction;
 
@@ -154,6 +193,7 @@ typedef struct METAL_PipelineCache
     SDL_MetalFragmentFunction fragmentFunction;
     MTLPixelFormat renderTargetFormat;
     const char *label;
+    NSString * specifiedFragmentShaderName;
 } METAL_PipelineCache;
 
 /* Each shader combination used by drawing functions has a separate pipeline
@@ -183,6 +223,7 @@ typedef struct METAL_ShaderPipelines
     @property (nonatomic, assign) METAL_ShaderPipelines *activepipelines;
     @property (nonatomic, assign) METAL_ShaderPipelines *allpipelines;
     @property (nonatomic, assign) int pipelinescount;
+    @property (nonatomic, assign) int fragmentSpecifiedPointer;
 @end
 
 @implementation METAL_RenderData
@@ -213,7 +254,6 @@ typedef struct METAL_ShaderPipelines
     @property (nonatomic, assign) BOOL yuv;
     @property (nonatomic, assign) BOOL nv12;
     @property (nonatomic, assign) size_t conversionBufferOffset;
-    @property (nonatomic, assign) NSString *specifiedFragmentShaderName;
 @end
 
 @implementation METAL_TextureData
@@ -290,8 +330,13 @@ GetVertexFunctionName(SDL_MetalVertexFunction function)
 }
 
 static NSString *
-GetFragmentFunctionName(SDL_MetalFragmentFunction function)
+GetFragmentFunctionName(NSString * shaderName, SDL_MetalFragmentFunction function)
 {
+    if (SDL_METAL_FRAGMENT_SPECIFIED_0 <= function)
+    {
+        return shaderName;
+    }
+
     switch (function) {
         case SDL_METAL_FRAGMENT_SOLID: return @"SDL_Solid_fragment";
         case SDL_METAL_FRAGMENT_COPY: return @"SDL_Copy_fragment";
@@ -304,20 +349,12 @@ GetFragmentFunctionName(SDL_MetalFragmentFunction function)
 
 static id<MTLRenderPipelineState>
 MakePipelineState(METAL_RenderData *data, METAL_PipelineCache *cache,
-                  NSString *blendlabel, SDL_BlendMode blendmode, NSString *specifiedFragmentShaderName)
+                  NSString *blendlabel, SDL_BlendMode blendmode)
 {
     id<MTLFunction> mtlvertfn = [data.mtllibrary newFunctionWithName:GetVertexFunctionName(cache->vertexFunction)];
+    id<MTLFunction> mtlfragfn = [data.mtllibrary newFunctionWithName:GetFragmentFunctionName(cache->specifiedFragmentShaderName, cache->fragmentFunction)];
     SDL_assert(mtlvertfn != nil);
-
-    id<MTLFunction> mtlfragfn = nil;
-    if (cache->fragmentFunction != SDL_METAL_FRAGMENT_SPECIFIED) {
-        mtlfragfn = [data.mtllibrary newFunctionWithName:GetFragmentFunctionName(cache->fragmentFunction)];
-    } else {
-        if (specifiedFragmentShaderName != nil) {
-            mtlfragfn = [data.mtllibrary newFunctionWithName:specifiedFragmentShaderName];
-        } else {
-        }
-    }
+    SDL_assert(mtlfragfn != nil);
 
     MTLRenderPipelineDescriptor *mtlpipedesc = [[MTLRenderPipelineDescriptor alloc] init];
     mtlpipedesc.vertexFunction = mtlvertfn;
@@ -379,13 +416,14 @@ MakePipelineCache(METAL_RenderData *data, METAL_PipelineCache *cache, const char
     cache->fragmentFunction = fragfn;
     cache->renderTargetFormat = rtformat;
     cache->label = label;
+    cache->specifiedFragmentShaderName = specifiedFragmentShaderName;
 
     /* Create pipeline states for the default blend modes. Custom blend modes
      * will be added to the cache on-demand. */
-    MakePipelineState(data, cache, @" (blend=none)", SDL_BLENDMODE_NONE, specifiedFragmentShaderName);
-    MakePipelineState(data, cache, @" (blend=blend)", SDL_BLENDMODE_BLEND, specifiedFragmentShaderName);
-    MakePipelineState(data, cache, @" (blend=add)", SDL_BLENDMODE_ADD, specifiedFragmentShaderName);
-    MakePipelineState(data, cache, @" (blend=mod)", SDL_BLENDMODE_MOD, specifiedFragmentShaderName);
+    MakePipelineState(data, cache, @" (blend=none)", SDL_BLENDMODE_NONE);
+    MakePipelineState(data, cache, @" (blend=blend)", SDL_BLENDMODE_BLEND);
+    MakePipelineState(data, cache, @" (blend=add)", SDL_BLENDMODE_ADD);
+    MakePipelineState(data, cache, @" (blend=mod)", SDL_BLENDMODE_MOD);
 }
 
 static void
@@ -456,7 +494,7 @@ DestroyAllPipelines(METAL_ShaderPipelines *allpipelines, int count)
 }
 
 static inline id<MTLRenderPipelineState>
-ChoosePipelineState(METAL_RenderData *data, METAL_ShaderPipelines *pipelines, SDL_MetalFragmentFunction fragfn, SDL_BlendMode blendmode, NSString *specifiedFragmentShaderName)
+ChoosePipelineState(METAL_RenderData *data, METAL_ShaderPipelines *pipelines, SDL_MetalFragmentFunction fragfn, SDL_BlendMode blendmode)
 {
     METAL_PipelineCache *cache = &pipelines->caches[fragfn];
 
@@ -466,7 +504,7 @@ ChoosePipelineState(METAL_RenderData *data, METAL_ShaderPipelines *pipelines, SD
         }
     }
 
-    return MakePipelineState(data, cache, [NSString stringWithFormat:@" (blend=custom 0x%x)", blendmode], blendmode, specifiedFragmentShaderName);
+    return MakePipelineState(data, cache, [NSString stringWithFormat:@" (blend=custom 0x%x)", blendmode], blendmode);
 }
 
 static void METAL_ChangeMetalShader(SDL_Renderer * renderer, const unsigned char * shader_metallib, const unsigned int shader_metallib_len) {
@@ -485,7 +523,6 @@ static void METAL_ChangeMetalShader(SDL_Renderer * renderer, const unsigned char
 #if !__has_feature(objc_arc)
     [mtllibrary release];
 #endif
-    data.activepipelines = ChooseShaderPipelines(data, MTLPixelFormatBGRA8Unorm);
 }
 
 static SDL_Renderer *
@@ -578,6 +615,8 @@ METAL_CreateRenderer(SDL_Window * window, Uint32 flags)
     samplerdesc.magFilter = MTLSamplerMinMagFilterLinear;
     id<MTLSamplerState> mtlsamplerlinear = [data.mtldevice newSamplerStateWithDescriptor:samplerdesc];
     data.mtlsamplerlinear = mtlsamplerlinear;
+
+    data.fragmentSpecifiedPointer = 0;
 
     /* Note: matrices are column major. */
     float identitytransform[16] = {
@@ -910,9 +949,7 @@ METAL_CreateTextureSpecifiedMetalFragmentShader(SDL_Renderer * renderer, SDL_Tex
     texturedata.nv12 = nv12;
 
     if (specifiedFragmentShaderName) {
-        texturedata.fragmentFunction = SDL_METAL_FRAGMENT_SPECIFIED;
-        NSString *nsstr = [NSString stringWithUTF8String: specifiedFragmentShaderName];
-        texturedata.specifiedFragmentShaderName = nsstr;
+        texturedata.fragmentFunction = SDL_METAL_FRAGMENT_SPECIFIED_0 + data.fragmentSpecifiedPointer;
     } else if (yuv) {
         texturedata.fragmentFunction = SDL_METAL_FRAGMENT_YUV;
     } else if (texture->format == SDL_PIXELFORMAT_NV12) {
@@ -937,11 +974,12 @@ METAL_CreateTextureSpecifiedMetalFragmentShader(SDL_Renderer * renderer, SDL_Tex
 
     texture->driverdata = (void*)CFBridgingRetain(texturedata);
 
-    if (texturedata.fragmentFunction == SDL_METAL_FRAGMENT_SPECIFIED) {
+    if (texturedata.fragmentFunction >= SDL_METAL_FRAGMENT_SPECIFIED_0) {
         METAL_ShaderPipelines *pipelines = data.allpipelines;
         pipelines->renderTargetFormat = pixfmt;
-        MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_SPECIFIED], "SDL specified pipeline", pixfmt, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_SPECIFIED, texturedata.specifiedFragmentShaderName);
-}
+        MakePipelineCache(data, &pipelines->caches[texturedata.fragmentFunction], "SDL specified pipeline", pixfmt, SDL_METAL_VERTEX_COPY, texturedata.fragmentFunction, [NSString stringWithCString:specifiedFragmentShaderName encoding:NSUTF8StringEncoding]);
+        data.fragmentSpecifiedPointer ++;
+    }
 
 #if !__has_feature(objc_arc)
     [texturedata release];
@@ -1176,7 +1214,7 @@ METAL_RenderClear(SDL_Renderer * renderer)
         // Slow path for clearing: draw a filled fullscreen triangle.
         METAL_SetOrthographicProjection(renderer, 1, 1);
         [data.mtlcmdencoder setViewport:viewport];
-        [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, SDL_METAL_FRAGMENT_SOLID, SDL_BLENDMODE_NONE, nil)];
+        [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, SDL_METAL_FRAGMENT_SOLID, SDL_BLENDMODE_NONE)];
         [data.mtlcmdencoder setVertexBuffer:data.mtlbufconstants offset:CONSTANTS_OFFSET_CLEAR_VERTS atIndex:0];
         [data.mtlcmdencoder setVertexBuffer:data.mtlbufconstants offset:CONSTANTS_OFFSET_IDENTITY atIndex:3];
         [data.mtlcmdencoder setFragmentBytes:color length:sizeof(color) atIndex:0];
@@ -1215,7 +1253,7 @@ DrawVerts(SDL_Renderer * renderer, const SDL_FPoint * points, int count,
     // !!! FIXME: render color should live in a dedicated uniform buffer.
     const float color[4] = { ((float)renderer->r) / 255.0f, ((float)renderer->g) / 255.0f, ((float)renderer->b) / 255.0f, ((float)renderer->a) / 255.0f };
 
-    [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, SDL_METAL_FRAGMENT_SOLID, renderer->blendMode, nil)];
+    [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, SDL_METAL_FRAGMENT_SOLID, renderer->blendMode)];
     [data.mtlcmdencoder setFragmentBytes:color length:sizeof(color) atIndex:0];
 
     [data.mtlcmdencoder setVertexBytes:points length:vertlen atIndex:0];
@@ -1246,7 +1284,7 @@ METAL_RenderFillRects(SDL_Renderer * renderer, const SDL_FRect * rects, int coun
     // !!! FIXME: render color should live in a dedicated uniform buffer.
     const float color[4] = { ((float)renderer->r) / 255.0f, ((float)renderer->g) / 255.0f, ((float)renderer->b) / 255.0f, ((float)renderer->a) / 255.0f };
 
-    [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, SDL_METAL_FRAGMENT_SOLID, renderer->blendMode, nil)];
+    [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, SDL_METAL_FRAGMENT_SOLID, renderer->blendMode)];
     [data.mtlcmdencoder setFragmentBytes:color length:sizeof(color) atIndex:0];
     [data.mtlcmdencoder setVertexBuffer:data.mtlbufconstants offset:CONSTANTS_OFFSET_IDENTITY atIndex:3];
 
@@ -1280,7 +1318,7 @@ METAL_SetupRenderCopy(METAL_RenderData *data, SDL_Texture *texture, METAL_Textur
 
     float resolution[2] = { texture->w, texture->h };
 
-    [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, texturedata.fragmentFunction, texture->blendMode, texturedata.specifiedFragmentShaderName)];
+    [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, texturedata.fragmentFunction, texture->blendMode)];
     [data.mtlcmdencoder setFragmentBytes:color length:sizeof(color) atIndex:0];
     [data.mtlcmdencoder setFragmentSamplerState:texturedata.mtlsampler atIndex:0];
     [data.mtlcmdencoder setFragmentBytes:resolution length:sizeof(resolution) atIndex:1];
