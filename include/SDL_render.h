@@ -244,6 +244,12 @@ extern DECLSPEC SDL_Texture * SDLCALL SDL_CreateTexture(SDL_Renderer * renderer,
                                                         int access, int w,
                                                         int h);
 
+extern DECLSPEC SDL_Texture * SDLCALL SDL_CreateTextureSpecifiedMetalFragmentShader(SDL_Renderer * renderer,
+                                                        Uint32 format,
+                                                        int access, int w,
+                                                        int h,
+                                                        const char * specifiedFragmentShaderName);
+
 /**
  *  \brief Create a texture from an existing surface.
  *
@@ -919,6 +925,8 @@ extern DECLSPEC void *SDLCALL SDL_RenderGetMetalLayer(SDL_Renderer * renderer);
  *  \sa SDL_RenderGetMetalLayer()
  */
 extern DECLSPEC void *SDLCALL SDL_RenderGetMetalCommandEncoder(SDL_Renderer * renderer);
+
+extern DECLSPEC void SDLCALL SDL_RenderChangeMetalShader(SDL_Renderer * renderer, const unsigned char * shader_metallib, const unsigned int shader_metallib_len);
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

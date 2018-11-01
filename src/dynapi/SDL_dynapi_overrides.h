@@ -304,6 +304,7 @@
 #define SDL_GetRendererInfo SDL_GetRendererInfo_REAL
 #define SDL_GetRendererOutputSize SDL_GetRendererOutputSize_REAL
 #define SDL_CreateTexture SDL_CreateTexture_REAL
+#define SDL_CreateTextureSpecifiedMetalFragmentShader SDL_CreateTextureSpecifiedMetalFragmentShader_REAL
 #define SDL_CreateTextureFromSurface SDL_CreateTextureFromSurface_REAL
 #define SDL_QueryTexture SDL_QueryTexture_REAL
 #define SDL_SetTextureColorMod SDL_SetTextureColorMod_REAL
@@ -344,6 +345,7 @@
 #define SDL_RenderCopyEx SDL_RenderCopyEx_REAL
 #define SDL_RenderReadPixels SDL_RenderReadPixels_REAL
 #define SDL_RenderPresent SDL_RenderPresent_REAL
+#define SDL_RenderChangeMetalShader SDL_RenderChangeMetalShader_REAL
 #define SDL_DestroyTexture SDL_DestroyTexture_REAL
 #define SDL_DestroyRenderer SDL_DestroyRenderer_REAL
 #define SDL_GL_BindTexture SDL_GL_BindTexture_REAL
