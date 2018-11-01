@@ -1278,10 +1278,12 @@ METAL_SetupRenderCopy(METAL_RenderData *data, SDL_Texture *texture, METAL_Textur
         color[3] = ((float)texture->a) / 255.0f;
     }
 
+    float resolution[2] = { texture->w, texture->h };
+
     [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, texturedata.fragmentFunction, texture->blendMode, texturedata.specifiedFragmentShaderName)];
     [data.mtlcmdencoder setFragmentBytes:color length:sizeof(color) atIndex:0];
     [data.mtlcmdencoder setFragmentSamplerState:texturedata.mtlsampler atIndex:0];
-
+    [data.mtlcmdencoder setFragmentBytes:resolution length:sizeof(resolution) atIndex:1];
     [data.mtlcmdencoder setFragmentTexture:texturedata.mtltexture atIndex:0];
 
     if (texturedata.yuv || texturedata.nv12) {
