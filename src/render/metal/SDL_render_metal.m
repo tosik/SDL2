@@ -523,6 +523,10 @@ static void METAL_ChangeMetalShader(SDL_Renderer * renderer, const unsigned char
 #if !__has_feature(objc_arc)
     [mtllibrary release];
 #endif
+
+    data.pipelinescount = 0;
+    data.allpipelines = NULL;
+    ChooseShaderPipelines(data, MTLPixelFormatBGRA8Unorm);
 }
 
 static SDL_Renderer *
