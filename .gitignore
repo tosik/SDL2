@@ -7,3 +7,4 @@ libtool
 sdl2-config
 sdl2-config.cmake
 sdl2.pc
+.vimrc.user
