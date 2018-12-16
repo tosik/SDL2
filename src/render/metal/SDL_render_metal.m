@@ -76,6 +76,8 @@ static int METAL_RenderFillRects(SDL_Renderer * renderer,
                               const SDL_FRect * rects, int count);
 static int METAL_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture,
                          const SDL_Rect * srcrect, const SDL_FRect * dstrect);
+static int METAL_RenderCopyWithValue(SDL_Renderer * renderer, SDL_Texture * texture,
+                         const SDL_Rect * srcrect, const SDL_FRect * dstrect, const float value);
 static int METAL_RenderCopyEx(SDL_Renderer * renderer, SDL_Texture * texture,
                          const SDL_Rect * srcrect, const SDL_FRect * dstrect,
                          const double angle, const SDL_FPoint *center, const SDL_RendererFlip flip);
@@ -703,6 +705,7 @@ METAL_CreateRenderer(SDL_Window * window, Uint32 flags)
     renderer->RenderDrawLines = METAL_RenderDrawLines;
     renderer->RenderFillRects = METAL_RenderFillRects;
     renderer->RenderCopy = METAL_RenderCopy;
+    renderer->RenderCopyWithValue = METAL_RenderCopyWithValue;
     renderer->RenderCopyEx = METAL_RenderCopyEx;
     renderer->RenderReadPixels = METAL_RenderReadPixels;
     renderer->RenderPresent = METAL_RenderPresent;
@@ -1310,7 +1313,7 @@ METAL_RenderFillRects(SDL_Renderer * renderer, const SDL_FRect * rects, int coun
 }}
 
 static void
-METAL_SetupRenderCopy(METAL_RenderData *data, SDL_Texture *texture, METAL_TextureData *texturedata)
+METAL_SetupRenderCopy(METAL_RenderData *data, SDL_Texture *texture, METAL_TextureData *texturedata, const float value)
 {
     float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
     if (texture->modMode) {
@@ -1321,11 +1324,13 @@ METAL_SetupRenderCopy(METAL_RenderData *data, SDL_Texture *texture, METAL_Textur
     }
 
     float resolution[2] = { texture->w, texture->h };
+    float values[2] = { value, 0 };
 
     [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, texturedata.fragmentFunction, texture->blendMode)];
     [data.mtlcmdencoder setFragmentBytes:color length:sizeof(color) atIndex:0];
     [data.mtlcmdencoder setFragmentSamplerState:texturedata.mtlsampler atIndex:0];
     [data.mtlcmdencoder setFragmentBytes:resolution length:sizeof(resolution) atIndex:1];
+    [data.mtlcmdencoder setFragmentBytes:values length:sizeof(values) atIndex:2];
     [data.mtlcmdencoder setFragmentTexture:texturedata.mtltexture atIndex:0];
 
     if (texturedata.yuv || texturedata.nv12) {
@@ -1344,7 +1349,41 @@ METAL_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture,
     const float texw = (float) texturedata.mtltexture.width;
     const float texh = (float) texturedata.mtltexture.height;
 
-    METAL_SetupRenderCopy(data, texture, texturedata);
+    METAL_SetupRenderCopy(data, texture, texturedata, 0);
+
+    const float xy[] = {
+        dstrect->x, dstrect->y + dstrect->h,
+        dstrect->x, dstrect->y,
+        dstrect->x + dstrect->w, dstrect->y + dstrect->h,
+        dstrect->x + dstrect->w, dstrect->y
+    };
+
+    const float uv[] = {
+        normtex(srcrect->x, texw), normtex(srcrect->y + srcrect->h, texh),
+        normtex(srcrect->x, texw), normtex(srcrect->y, texh),
+        normtex(srcrect->x + srcrect->w, texw), normtex(srcrect->y + srcrect->h, texh),
+        normtex(srcrect->x + srcrect->w, texw), normtex(srcrect->y, texh)
+    };
+
+    [data.mtlcmdencoder setVertexBytes:xy length:sizeof(xy) atIndex:0];
+    [data.mtlcmdencoder setVertexBytes:uv length:sizeof(uv) atIndex:1];
+    [data.mtlcmdencoder setVertexBuffer:data.mtlbufconstants offset:CONSTANTS_OFFSET_IDENTITY atIndex:3];
+    [data.mtlcmdencoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+
+    return 0;
+}}
+
+static int
+METAL_RenderCopyWithValue(SDL_Renderer * renderer, SDL_Texture * texture,
+              const SDL_Rect * srcrect, const SDL_FRect * dstrect, const float value)
+{ @autoreleasepool {
+    METAL_ActivateRenderCommandEncoder(renderer, MTLLoadActionLoad);
+    METAL_RenderData *data = (__bridge METAL_RenderData *) renderer->driverdata;
+    METAL_TextureData *texturedata = (__bridge METAL_TextureData *)texture->driverdata;
+    const float texw = (float) texturedata.mtltexture.width;
+    const float texh = (float) texturedata.mtltexture.height;
+
+    METAL_SetupRenderCopy(data, texture, texturedata, value);
 
     const float xy[] = {
         dstrect->x, dstrect->y + dstrect->h,
@@ -1381,7 +1420,7 @@ METAL_RenderCopyEx(SDL_Renderer * renderer, SDL_Texture * texture,
     float transform[16];
     float minu, maxu, minv, maxv;
 
-    METAL_SetupRenderCopy(data, texture, texturedata);
+    METAL_SetupRenderCopy(data, texture, texturedata, 0);
 
     minu = normtex(srcrect->x, texw);
     maxu = normtex(srcrect->x + srcrect->w, texw);

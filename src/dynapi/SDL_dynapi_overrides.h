@@ -342,6 +342,7 @@
 #define SDL_RenderFillRect SDL_RenderFillRect_REAL
 #define SDL_RenderFillRects SDL_RenderFillRects_REAL
 #define SDL_RenderCopy SDL_RenderCopy_REAL
+#define SDL_RenderCopyWithValue SDL_RenderCopyWithValue_REAL
 #define SDL_RenderCopyEx SDL_RenderCopyEx_REAL
 #define SDL_RenderReadPixels SDL_RenderReadPixels_REAL
 #define SDL_RenderPresent SDL_RenderPresent_REAL

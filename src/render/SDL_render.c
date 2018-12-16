@@ -2058,6 +2058,58 @@ SDL_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture,
     return renderer->RenderCopy(renderer, texture, &real_srcrect, &frect);
 }
 
+int
+SDL_RenderCopyWithValue(SDL_Renderer * renderer, SDL_Texture * texture,
+               const SDL_Rect * srcrect, const SDL_Rect * dstrect, const float value)
+{
+    SDL_Rect real_srcrect = { 0, 0, 0, 0 };
+    SDL_Rect real_dstrect = { 0, 0, 0, 0 };
+    SDL_FRect frect;
+
+    CHECK_RENDERER_MAGIC(renderer, -1);
+    CHECK_TEXTURE_MAGIC(texture, -1);
+
+    if (renderer != texture->renderer) {
+        return SDL_SetError("Texture was not created with this renderer");
+    }
+
+    /* Don't draw while we're hidden */
+    if (renderer->hidden) {
+        return 0;
+    }
+
+    real_srcrect.x = 0;
+    real_srcrect.y = 0;
+    real_srcrect.w = texture->w;
+    real_srcrect.h = texture->h;
+    if (srcrect) {
+        if (!SDL_IntersectRect(srcrect, &real_srcrect, &real_srcrect)) {
+            return 0;
+        }
+    }
+
+    SDL_RenderGetViewport(renderer, &real_dstrect);
+    real_dstrect.x = 0;
+    real_dstrect.y = 0;
+    if (dstrect) {
+        if (!SDL_HasIntersection(dstrect, &real_dstrect)) {
+            return 0;
+        }
+        real_dstrect = *dstrect;
+    }
+
+    if (texture->native) {
+        texture = texture->native;
+    }
+
+    frect.x = real_dstrect.x * renderer->scale.x;
+    frect.y = real_dstrect.y * renderer->scale.y;
+    frect.w = real_dstrect.w * renderer->scale.x;
+    frect.h = real_dstrect.h * renderer->scale.y;
+
+    return renderer->RenderCopyWithValue(renderer, texture, &real_srcrect, &frect, value);
+}
+
 
 int
 SDL_RenderCopyEx(SDL_Renderer * renderer, SDL_Texture * texture,

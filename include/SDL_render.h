@@ -818,6 +818,11 @@ extern DECLSPEC int SDLCALL SDL_RenderCopy(SDL_Renderer * renderer,
                                            const SDL_Rect * srcrect,
                                            const SDL_Rect * dstrect);
 
+extern DECLSPEC int SDLCALL SDL_RenderCopyWithValue(SDL_Renderer * renderer,
+                                           SDL_Texture * texture,
+                                           const SDL_Rect * srcrect,
+                                           const SDL_Rect * dstrect, float value);
+
 /**
  *  \brief Copy a portion of the source texture to the current rendering target, rotating it by angle around the given center
  *
