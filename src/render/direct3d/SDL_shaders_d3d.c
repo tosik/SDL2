@@ -257,11 +257,44 @@ static const DWORD D3D9_PixelShader_YUV_BT709[] = {
     0x90e40000, 0x02000001, 0x800f0800, 0x80e40000, 0x0000ffff
 };
 
+static const DWORD D3D9_PixelShader_SPECIFIED_0[] = {
+    0xffff0200, 0x0025fffe, 0x42415443, 0x0000001c, 0x0000005f, 0xffff0200,
+0x00000001, 0x0000001c, 0x00000100, 0x00000058, 0x00000030, 0x00000003,
+0x00000001, 0x00000048, 0x00000000, 0x53656874, 0x6c706d61, 0x742b7265,
+0x65546568, 0x72757478, 0xab005965, 0x00070004, 0x00040001, 0x00000001,
+0x00000000, 0x325f7370, 0x4d00305f, 0x6f726369, 0x74666f73, 0x29522820,
+0x534c4820, 0x6853204c, 0x72656461, 0x6d6f4320, 0x656c6970, 0x2e392072,
+0x392e3932, 0x332e3235, 0x00313131, 0x05000051, 0xa00f0000, 0x00000000,
+0x00000000, 0x00000000, 0x3f800000, 0x0200001f, 0x80000000, 0xb0030000,
+0x0200001f, 0x90000000, 0xa00f0800, 0x03000042, 0x800f0000, 0xb0e40000,
+0xa0e40800, 0x02000001, 0x80060000, 0xa0550000, 0x02000001, 0x80080000,
+0xa0ff0000, 0x02000001, 0x800f0800, 0x80e40000, 0x0000ffff
+};
+static const DWORD D3D9_PixelShader_SPECIFIED_1[] = {};
+static const DWORD D3D9_PixelShader_SPECIFIED_2[] = {};
+static const DWORD D3D9_PixelShader_SPECIFIED_3[] = {};
+static const DWORD D3D9_PixelShader_SPECIFIED_4[] = {};
+static const DWORD D3D9_PixelShader_SPECIFIED_5[] = {};
+static const DWORD D3D9_PixelShader_SPECIFIED_6[] = {};
+static const DWORD D3D9_PixelShader_SPECIFIED_7[] = {};
+static const DWORD D3D9_PixelShader_SPECIFIED_8[] = {};
+static const DWORD D3D9_PixelShader_SPECIFIED_9[] = {};
+
 
 static const DWORD *D3D9_shaders[] = {
     D3D9_PixelShader_YUV_JPEG,
     D3D9_PixelShader_YUV_BT601,
     D3D9_PixelShader_YUV_BT709,
+    D3D9_PixelShader_SPECIFIED_0,
+    D3D9_PixelShader_SPECIFIED_1,
+    D3D9_PixelShader_SPECIFIED_2,
+    D3D9_PixelShader_SPECIFIED_3,
+    D3D9_PixelShader_SPECIFIED_4,
+    D3D9_PixelShader_SPECIFIED_5,
+    D3D9_PixelShader_SPECIFIED_6,
+    D3D9_PixelShader_SPECIFIED_7,
+    D3D9_PixelShader_SPECIFIED_8,
+    D3D9_PixelShader_SPECIFIED_9,
 };
 
 HRESULT D3D9_CreatePixelShader(IDirect3DDevice9 *d3dDevice, D3D9_Shader shader, IDirect3DPixelShader9 **pixelShader)

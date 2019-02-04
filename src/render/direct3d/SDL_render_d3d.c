@@ -48,6 +48,7 @@ static SDL_Renderer *D3D_CreateRenderer(SDL_Window * window, Uint32 flags);
 static void D3D_WindowEvent(SDL_Renderer * renderer,
                             const SDL_WindowEvent *event);
 static SDL_bool D3D_SupportsBlendMode(SDL_Renderer * renderer, SDL_BlendMode blendMode);
+static int D3D_CreateTextureSpecifiedD3DFragmentShader(SDL_Renderer * renderer, SDL_Texture * texture, unsigned int shader_id);
 static int D3D_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
 static int D3D_RecreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
 static int D3D_UpdateTexture(SDL_Renderer * renderer, SDL_Texture * texture,
@@ -136,6 +137,8 @@ typedef struct
     Uint8 *pixels;
     int pitch;
     SDL_Rect locked_rect;
+
+    unsigned int shader_id;
 } D3D_TextureData;
 
 typedef struct
@@ -470,6 +473,7 @@ D3D_CreateRenderer(SDL_Window * window, Uint32 flags)
     renderer->WindowEvent = D3D_WindowEvent;
     renderer->SupportsBlendMode = D3D_SupportsBlendMode;
     renderer->CreateTexture = D3D_CreateTexture;
+    renderer->CreateTextureSpecifiedD3DFragmentShader = D3D_CreateTextureSpecifiedD3DFragmentShader;
     renderer->UpdateTexture = D3D_UpdateTexture;
     renderer->UpdateTextureYUV = D3D_UpdateTextureYUV;
     renderer->LockTexture = D3D_LockTexture;
@@ -803,6 +807,25 @@ D3D_DestroyTextureRep(D3D_TextureRep *texture)
     if (texture->staging) {
         IDirect3DTexture9_Release(texture->staging);
         texture->staging = NULL;
+    }
+}
+
+static int
+D3D_CreateTextureSpecifiedD3DFragmentShader(SDL_Renderer * renderer, SDL_Texture * texture, unsigned int shader_id)
+{
+    int result;
+    result  = D3D_CreateTexture(renderer, texture);
+    printf("CreateTextureSpecifiedD3DFragmentShader\n");
+    if (result == 0) {
+        D3D_TextureData * texturedata = (D3D_TextureData *)texture->driverdata;
+        if (shader_id >= SHADER_SPECIFIED_0) {
+            texturedata->shader_id = shader_id;
+        } else {
+            texturedata->shader_id = 0;
+        }
+        return 0;
+    } else {
+        return -1;
     }
 }
 
@@ -1430,7 +1453,10 @@ D3D_RenderSetupTextureState(SDL_Renderer * renderer, SDL_Texture * texture, LPDI
         return -1;
     }
 
-    if (texturedata->yuv) {
+    if (texturedata->shader_id >= SHADER_SPECIFIED_0) {
+        printf("D3D shader_id = %d\n", texturedata->shader_id);
+        *shader = data->shaders[texturedata->shader_id];
+    } else if (texturedata->yuv) {
         switch (SDL_GetYUVConversionModeForResolution(texture->w, texture->h)) {
         case SDL_YUV_CONVERSION_JPEG:
             *shader = data->shaders[SHADER_YUV_JPEG];

@@ -91,6 +91,7 @@ struct SDL_Renderer
     SDL_bool (*SupportsBlendMode)(SDL_Renderer * renderer, SDL_BlendMode blendMode);
     int (*CreateTexture) (SDL_Renderer * renderer, SDL_Texture * texture);
     int (*CreateTextureSpecifiedMetalFragmentShader) (SDL_Renderer * renderer, SDL_Texture * texture, const char  * speficiedFragmentShaderName);
+    int (*CreateTextureSpecifiedD3DFragmentShader) (SDL_Renderer * renderer, SDL_Texture * texture, unsigned int shader_id);
     int (*SetTextureColorMod) (SDL_Renderer * renderer,
                                SDL_Texture * texture);
     int (*SetTextureAlphaMod) (SDL_Renderer * renderer,

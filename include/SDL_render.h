@@ -250,6 +250,12 @@ extern DECLSPEC SDL_Texture * SDLCALL SDL_CreateTextureSpecifiedMetalFragmentSha
                                                         int h,
                                                         const char * specifiedFragmentShaderName);
 
+extern DECLSPEC SDL_Texture * SDLCALL SDL_CreateTextureSpecifiedD3DFragmentShader(SDL_Renderer * renderer,
+                                                        Uint32 format,
+                                                        int access, int w,
+                                                        int h,
+                                                        unsigned int shader_id);
+
 /**
  *  \brief Create a texture from an existing surface.
  *

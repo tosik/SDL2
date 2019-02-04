@@ -336,6 +336,7 @@ SDL_DYNAPI_PROC(int,SDL_GetRendererInfo,(SDL_Renderer *a, SDL_RendererInfo *b),(
 SDL_DYNAPI_PROC(int,SDL_GetRendererOutputSize,(SDL_Renderer *a, int *b, int *c),(a,b,c),return)
 SDL_DYNAPI_PROC(SDL_Texture*,SDL_CreateTexture,(SDL_Renderer *a, Uint32 b, int c, int d, int e),(a,b,c,d,e),return)
 SDL_DYNAPI_PROC(SDL_Texture*,SDL_CreateTextureSpecifiedMetalFragmentShader,(SDL_Renderer *a, Uint32 b, int c, int d, int e, const char * f),(a,b,c,d,e,f),return)
+SDL_DYNAPI_PROC(SDL_Texture*,SDL_CreateTextureSpecifiedD3DFragmentShader,(SDL_Renderer *a, Uint32 b, int c, int d, int e, unsigned int f),(a,b,c,d,e,f),return)
 SDL_DYNAPI_PROC(SDL_Texture*,SDL_CreateTextureFromSurface,(SDL_Renderer *a, SDL_Surface *b),(a,b),return)
 SDL_DYNAPI_PROC(int,SDL_QueryTexture,(SDL_Texture *a, Uint32 *b, int *c, int *d, int *e),(a,b,c,d,e),return)
 SDL_DYNAPI_PROC(int,SDL_SetTextureColorMod,(SDL_Texture *a, Uint8 b, Uint8 c, Uint8 d),(a,b,c,d),return)
