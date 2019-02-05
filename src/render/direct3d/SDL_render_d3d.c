@@ -815,7 +815,6 @@ D3D_CreateTextureSpecifiedD3DFragmentShader(SDL_Renderer * renderer, SDL_Texture
 {
     int result;
     result  = D3D_CreateTexture(renderer, texture);
-    printf("CreateTextureSpecifiedD3DFragmentShader\n");
     if (result == 0) {
         D3D_TextureData * texturedata = (D3D_TextureData *)texture->driverdata;
         if (shader_id >= SHADER_SPECIFIED_0) {
@@ -1454,7 +1453,6 @@ D3D_RenderSetupTextureState(SDL_Renderer * renderer, SDL_Texture * texture, LPDI
     }
 
     if (texturedata->shader_id >= SHADER_SPECIFIED_0) {
-        printf("D3D shader_id = %d\n", texturedata->shader_id);
         *shader = data->shaders[texturedata->shader_id];
     } else if (texturedata->yuv) {
         switch (SDL_GetYUVConversionModeForResolution(texture->w, texture->h)) {
