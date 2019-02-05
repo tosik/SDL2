@@ -12,40 +12,28 @@ SamplerState theSampler = sampler_state
 
 struct PixelShaderInput
 {
-  float4 pos : SV_POSITION;
   float2 tex : TEXCOORD0;
   float4 color : COLOR0;
 };
 
 float4 main(PixelShaderInput input) : SV_TARGET
 {
-/*
-  const float3 offset = {-0.0627451017, -0.501960814, -0.501960814};
-  const float3 Rcoeff = {1.1644,  0.0000,  1.7927};
-  const float3 Gcoeff = {1.1644, -0.2132, -0.5329};
-  const float3 Bcoeff = {1.1644,  2.1124,  0.0000};
+  // 352
 
-  float4 Output;
+  // scan_line
+  float scan_line;
+  if (trunc(input.tex.y * 352) % 2 == 0)
+    scan_line = 1.0;
+  else
+    scan_line = 0.97;
 
-  float3 yuv;
-  yuv.x = theTextureY.Sample(theSampler, input.tex).r;
-  yuv.y = theTextureU.Sample(theSampler, input.tex).r;
-  yuv.z = theTextureV.Sample(theSampler, input.tex).r;
+  // pick color
+  float4 c;
+  c.rgb = theTextureY.Sample(theSampler, input.tex).rgb;
+  c.a = 1;
 
-  yuv += offset;
-  Output.r = dot(yuv, Rcoeff);
-  Output.g = dot(yuv, Gcoeff);
-  Output.b = dot(yuv, Bcoeff);
-  Output.a = 1.0f;
-
-  return Output * input.color;
-*/
-
-  float4 output;
-  output.r = theTextureY.Sample(theSampler, input.tex).r;
-  output.g = 0;
-  output.b = 0;
-  output.a = 1;
-  return output;
+  // contrast
+  float contrast = 6;
+  return 1 / (1 + exp(-contrast * (c * scan_line - 0.5)));
 }
 
