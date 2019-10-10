@@ -52,6 +52,7 @@ static void METAL_WindowEvent(SDL_Renderer * renderer,
 static int METAL_GetOutputSize(SDL_Renderer * renderer, int *w, int *h);
 static SDL_bool METAL_SupportsBlendMode(SDL_Renderer * renderer, SDL_BlendMode blendMode);
 static int METAL_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
+static int METAL_CreateTextureSpecifiedMetalFragmentShader(SDL_Renderer * renderer, SDL_Texture * texture, const char * specifiedFragmentShaderName);
 static int METAL_UpdateTexture(SDL_Renderer * renderer, SDL_Texture * texture,
                             const SDL_Rect * rect, const void *pixels,
                             int pitch);
@@ -75,6 +76,8 @@ static int METAL_RenderFillRects(SDL_Renderer * renderer,
                               const SDL_FRect * rects, int count);
 static int METAL_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture,
                          const SDL_Rect * srcrect, const SDL_FRect * dstrect);
+static int METAL_RenderCopyWithValue(SDL_Renderer * renderer, SDL_Texture * texture,
+                         const SDL_Rect * srcrect, const SDL_FRect * dstrect, const float value);
 static int METAL_RenderCopyEx(SDL_Renderer * renderer, SDL_Texture * texture,
                          const SDL_Rect * srcrect, const SDL_FRect * dstrect,
                          const double angle, const SDL_FPoint *center, const SDL_RendererFlip flip);
@@ -85,6 +88,7 @@ static void METAL_DestroyTexture(SDL_Renderer * renderer, SDL_Texture * texture)
 static void METAL_DestroyRenderer(SDL_Renderer * renderer);
 static void *METAL_GetMetalLayer(SDL_Renderer * renderer);
 static void *METAL_GetMetalCommandEncoder(SDL_Renderer * renderer);
+static void METAL_ChangeMetalShader(SDL_Renderer * renderer, const unsigned char * shader_metallib, const unsigned int shader_metallib_len);
 
 SDL_RenderDriver METAL_RenderDriver = {
     METAL_CreateRenderer,
@@ -134,6 +138,46 @@ typedef enum SDL_MetalFragmentFunction
     SDL_METAL_FRAGMENT_YUV,
     SDL_METAL_FRAGMENT_NV12,
     SDL_METAL_FRAGMENT_NV21,
+    SDL_METAL_FRAGMENT_SPECIFIED_0,
+    SDL_METAL_FRAGMENT_SPECIFIED_1,
+    SDL_METAL_FRAGMENT_SPECIFIED_2,
+    SDL_METAL_FRAGMENT_SPECIFIED_3,
+    SDL_METAL_FRAGMENT_SPECIFIED_4,
+    SDL_METAL_FRAGMENT_SPECIFIED_5,
+    SDL_METAL_FRAGMENT_SPECIFIED_6,
+    SDL_METAL_FRAGMENT_SPECIFIED_7,
+    SDL_METAL_FRAGMENT_SPECIFIED_8,
+    SDL_METAL_FRAGMENT_SPECIFIED_9,
+    SDL_METAL_FRAGMENT_SPECIFIED_10,
+    SDL_METAL_FRAGMENT_SPECIFIED_11,
+    SDL_METAL_FRAGMENT_SPECIFIED_12,
+    SDL_METAL_FRAGMENT_SPECIFIED_13,
+    SDL_METAL_FRAGMENT_SPECIFIED_14,
+    SDL_METAL_FRAGMENT_SPECIFIED_15,
+    SDL_METAL_FRAGMENT_SPECIFIED_16,
+    SDL_METAL_FRAGMENT_SPECIFIED_17,
+    SDL_METAL_FRAGMENT_SPECIFIED_18,
+    SDL_METAL_FRAGMENT_SPECIFIED_19,
+    SDL_METAL_FRAGMENT_SPECIFIED_20,
+    SDL_METAL_FRAGMENT_SPECIFIED_21,
+    SDL_METAL_FRAGMENT_SPECIFIED_22,
+    SDL_METAL_FRAGMENT_SPECIFIED_23,
+    SDL_METAL_FRAGMENT_SPECIFIED_24,
+    SDL_METAL_FRAGMENT_SPECIFIED_25,
+    SDL_METAL_FRAGMENT_SPECIFIED_26,
+    SDL_METAL_FRAGMENT_SPECIFIED_27,
+    SDL_METAL_FRAGMENT_SPECIFIED_28,
+    SDL_METAL_FRAGMENT_SPECIFIED_29,
+    SDL_METAL_FRAGMENT_SPECIFIED_30,
+    SDL_METAL_FRAGMENT_SPECIFIED_31,
+    SDL_METAL_FRAGMENT_SPECIFIED_32,
+    SDL_METAL_FRAGMENT_SPECIFIED_33,
+    SDL_METAL_FRAGMENT_SPECIFIED_34,
+    SDL_METAL_FRAGMENT_SPECIFIED_35,
+    SDL_METAL_FRAGMENT_SPECIFIED_36,
+    SDL_METAL_FRAGMENT_SPECIFIED_37,
+    SDL_METAL_FRAGMENT_SPECIFIED_38,
+    SDL_METAL_FRAGMENT_SPECIFIED_39,
     SDL_METAL_FRAGMENT_COUNT,
 } SDL_MetalFragmentFunction;
 
@@ -151,6 +195,7 @@ typedef struct METAL_PipelineCache
     SDL_MetalFragmentFunction fragmentFunction;
     MTLPixelFormat renderTargetFormat;
     const char *label;
+    NSString * specifiedFragmentShaderName;
 } METAL_PipelineCache;
 
 /* Each shader combination used by drawing functions has a separate pipeline
@@ -180,6 +225,7 @@ typedef struct METAL_ShaderPipelines
     @property (nonatomic, assign) METAL_ShaderPipelines *activepipelines;
     @property (nonatomic, assign) METAL_ShaderPipelines *allpipelines;
     @property (nonatomic, assign) int pipelinescount;
+    @property (nonatomic, assign) int fragmentSpecifiedPointer;
 @end
 
 @implementation METAL_RenderData
@@ -286,8 +332,13 @@ GetVertexFunctionName(SDL_MetalVertexFunction function)
 }
 
 static NSString *
-GetFragmentFunctionName(SDL_MetalFragmentFunction function)
+GetFragmentFunctionName(NSString * shaderName, SDL_MetalFragmentFunction function)
 {
+    if (SDL_METAL_FRAGMENT_SPECIFIED_0 <= function)
+    {
+        return shaderName;
+    }
+
     switch (function) {
         case SDL_METAL_FRAGMENT_SOLID: return @"SDL_Solid_fragment";
         case SDL_METAL_FRAGMENT_COPY: return @"SDL_Copy_fragment";
@@ -303,7 +354,7 @@ MakePipelineState(METAL_RenderData *data, METAL_PipelineCache *cache,
                   NSString *blendlabel, SDL_BlendMode blendmode)
 {
     id<MTLFunction> mtlvertfn = [data.mtllibrary newFunctionWithName:GetVertexFunctionName(cache->vertexFunction)];
-    id<MTLFunction> mtlfragfn = [data.mtllibrary newFunctionWithName:GetFragmentFunctionName(cache->fragmentFunction)];
+    id<MTLFunction> mtlfragfn = [data.mtllibrary newFunctionWithName:GetFragmentFunctionName(cache->specifiedFragmentShaderName, cache->fragmentFunction)];
     SDL_assert(mtlvertfn != nil);
     SDL_assert(mtlfragfn != nil);
 
@@ -359,7 +410,7 @@ MakePipelineState(METAL_RenderData *data, METAL_PipelineCache *cache,
 
 static void
 MakePipelineCache(METAL_RenderData *data, METAL_PipelineCache *cache, const char *label,
-                  MTLPixelFormat rtformat, SDL_MetalVertexFunction vertfn, SDL_MetalFragmentFunction fragfn)
+                  MTLPixelFormat rtformat, SDL_MetalVertexFunction vertfn, SDL_MetalFragmentFunction fragfn, NSString * specifiedFragmentShaderName)
 {
     SDL_zerop(cache);
 
@@ -367,6 +418,7 @@ MakePipelineCache(METAL_RenderData *data, METAL_PipelineCache *cache, const char
     cache->fragmentFunction = fragfn;
     cache->renderTargetFormat = rtformat;
     cache->label = label;
+    cache->specifiedFragmentShaderName = specifiedFragmentShaderName;
 
     /* Create pipeline states for the default blend modes. Custom blend modes
      * will be added to the cache on-demand. */
@@ -395,11 +447,11 @@ MakeShaderPipelines(METAL_RenderData *data, METAL_ShaderPipelines *pipelines, MT
 
     pipelines->renderTargetFormat = rtformat;
 
-    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_SOLID], "SDL primitives pipeline", rtformat, SDL_METAL_VERTEX_SOLID, SDL_METAL_FRAGMENT_SOLID);
-    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_COPY], "SDL copy pipeline", rtformat, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_COPY);
-    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_YUV], "SDL YUV pipeline", rtformat, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_YUV);
-    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_NV12], "SDL NV12 pipeline", rtformat, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_NV12);
-    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_NV21], "SDL NV21 pipeline", rtformat, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_NV21);
+    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_SOLID], "SDL primitives pipeline", rtformat, SDL_METAL_VERTEX_SOLID, SDL_METAL_FRAGMENT_SOLID, nil);
+    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_COPY], "SDL copy pipeline", rtformat, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_COPY, nil);
+    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_YUV], "SDL YUV pipeline", rtformat, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_YUV, nil);
+    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_NV12], "SDL NV12 pipeline", rtformat, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_NV12, nil);
+    MakePipelineCache(data, &pipelines->caches[SDL_METAL_FRAGMENT_NV21], "SDL NV21 pipeline", rtformat, SDL_METAL_VERTEX_COPY, SDL_METAL_FRAGMENT_NV21, nil);
 }
 
 static METAL_ShaderPipelines *
@@ -455,6 +507,28 @@ ChoosePipelineState(METAL_RenderData *data, METAL_ShaderPipelines *pipelines, SD
     }
 
     return MakePipelineState(data, cache, [NSString stringWithFormat:@" (blend=custom 0x%x)", blendmode], blendmode);
+}
+
+static void METAL_ChangeMetalShader(SDL_Renderer * renderer, const unsigned char * shader_metallib, const unsigned int shader_metallib_len) {
+    METAL_RenderData *data = renderer->driverdata;
+
+    NSError *err = nil;
+    dispatch_data_t mtllibdata = dispatch_data_create(shader_metallib, shader_metallib_len, dispatch_get_global_queue(0, 0), ^{});
+    id<MTLLibrary> mtllibrary = [data.mtldevice newLibraryWithData:mtllibdata error:&err];
+    data.mtllibrary = mtllibrary;
+    SDL_assert(err == nil);
+#if !__has_feature(objc_arc)
+    dispatch_release(mtllibdata);
+#endif
+    data.mtllibrary.label = @"User's Metal renderer shader library";
+
+#if !__has_feature(objc_arc)
+    [mtllibrary release];
+#endif
+
+    data.pipelinescount = 0;
+    data.allpipelines = NULL;
+    ChooseShaderPipelines(data, MTLPixelFormatBGRA8Unorm);
 }
 
 static SDL_Renderer *
@@ -548,6 +622,8 @@ METAL_CreateRenderer(SDL_Window * window, Uint32 flags)
     id<MTLSamplerState> mtlsamplerlinear = [data.mtldevice newSamplerStateWithDescriptor:samplerdesc];
     data.mtlsamplerlinear = mtlsamplerlinear;
 
+    data.fragmentSpecifiedPointer = 0;
+
     /* Note: matrices are column major. */
     float identitytransform[16] = {
         1.0f, 0.0f, 0.0f, 0.0f,
@@ -616,6 +692,7 @@ METAL_CreateRenderer(SDL_Window * window, Uint32 flags)
     renderer->GetOutputSize = METAL_GetOutputSize;
     renderer->SupportsBlendMode = METAL_SupportsBlendMode;
     renderer->CreateTexture = METAL_CreateTexture;
+    renderer->CreateTextureSpecifiedMetalFragmentShader = METAL_CreateTextureSpecifiedMetalFragmentShader;
     renderer->UpdateTexture = METAL_UpdateTexture;
     renderer->UpdateTextureYUV = METAL_UpdateTextureYUV;
     renderer->LockTexture = METAL_LockTexture;
@@ -628,6 +705,7 @@ METAL_CreateRenderer(SDL_Window * window, Uint32 flags)
     renderer->RenderDrawLines = METAL_RenderDrawLines;
     renderer->RenderFillRects = METAL_RenderFillRects;
     renderer->RenderCopy = METAL_RenderCopy;
+    renderer->RenderCopyWithValue = METAL_RenderCopyWithValue;
     renderer->RenderCopyEx = METAL_RenderCopyEx;
     renderer->RenderReadPixels = METAL_RenderReadPixels;
     renderer->RenderPresent = METAL_RenderPresent;
@@ -635,6 +713,7 @@ METAL_CreateRenderer(SDL_Window * window, Uint32 flags)
     renderer->DestroyRenderer = METAL_DestroyRenderer;
     renderer->GetMetalLayer = METAL_GetMetalLayer;
     renderer->GetMetalCommandEncoder = METAL_GetMetalCommandEncoder;
+    renderer->ChangeMetalShader = METAL_ChangeMetalShader;
 
     renderer->info = METAL_RenderDriver.info;
     renderer->info.flags = (SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
@@ -793,7 +872,12 @@ METAL_SupportsBlendMode(SDL_Renderer * renderer, SDL_BlendMode blendMode)
 }
 
 static int
-METAL_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture)
+METAL_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture) {
+    return METAL_CreateTextureSpecifiedMetalFragmentShader(renderer, texture, nil);
+}
+
+static int
+METAL_CreateTextureSpecifiedMetalFragmentShader(SDL_Renderer * renderer, SDL_Texture * texture, const char * specifiedFragmentShaderName)
 { @autoreleasepool {
     METAL_RenderData *data = (__bridge METAL_RenderData *) renderer->driverdata;
     MTLPixelFormat pixfmt;
@@ -871,7 +955,9 @@ METAL_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture)
     texturedata.yuv = yuv;
     texturedata.nv12 = nv12;
 
-    if (yuv) {
+    if (specifiedFragmentShaderName) {
+        texturedata.fragmentFunction = SDL_METAL_FRAGMENT_SPECIFIED_0 + data.fragmentSpecifiedPointer;
+    } else if (yuv) {
         texturedata.fragmentFunction = SDL_METAL_FRAGMENT_YUV;
     } else if (texture->format == SDL_PIXELFORMAT_NV12) {
         texturedata.fragmentFunction = SDL_METAL_FRAGMENT_NV12;
@@ -894,6 +980,13 @@ METAL_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture)
     }
 
     texture->driverdata = (void*)CFBridgingRetain(texturedata);
+
+    if (texturedata.fragmentFunction >= SDL_METAL_FRAGMENT_SPECIFIED_0) {
+        METAL_ShaderPipelines *pipelines = data.allpipelines;
+        pipelines->renderTargetFormat = pixfmt;
+        MakePipelineCache(data, &pipelines->caches[texturedata.fragmentFunction], "SDL specified pipeline", pixfmt, SDL_METAL_VERTEX_COPY, texturedata.fragmentFunction, [NSString stringWithCString:specifiedFragmentShaderName encoding:NSUTF8StringEncoding]);
+        data.fragmentSpecifiedPointer ++;
+    }
 
 #if !__has_feature(objc_arc)
     [texturedata release];
@@ -1220,7 +1313,7 @@ METAL_RenderFillRects(SDL_Renderer * renderer, const SDL_FRect * rects, int coun
 }}
 
 static void
-METAL_SetupRenderCopy(METAL_RenderData *data, SDL_Texture *texture, METAL_TextureData *texturedata)
+METAL_SetupRenderCopy(METAL_RenderData *data, SDL_Texture *texture, METAL_TextureData *texturedata, const float value)
 {
     float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
     if (texture->modMode) {
@@ -1230,10 +1323,14 @@ METAL_SetupRenderCopy(METAL_RenderData *data, SDL_Texture *texture, METAL_Textur
         color[3] = ((float)texture->a) / 255.0f;
     }
 
+    float resolution[2] = { texture->w, texture->h };
+    float values[2] = { value, 0 };
+
     [data.mtlcmdencoder setRenderPipelineState:ChoosePipelineState(data, data.activepipelines, texturedata.fragmentFunction, texture->blendMode)];
     [data.mtlcmdencoder setFragmentBytes:color length:sizeof(color) atIndex:0];
     [data.mtlcmdencoder setFragmentSamplerState:texturedata.mtlsampler atIndex:0];
-
+    [data.mtlcmdencoder setFragmentBytes:resolution length:sizeof(resolution) atIndex:1];
+    [data.mtlcmdencoder setFragmentBytes:values length:sizeof(values) atIndex:2];
     [data.mtlcmdencoder setFragmentTexture:texturedata.mtltexture atIndex:0];
 
     if (texturedata.yuv || texturedata.nv12) {
@@ -1252,7 +1349,41 @@ METAL_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture,
     const float texw = (float) texturedata.mtltexture.width;
     const float texh = (float) texturedata.mtltexture.height;
 
-    METAL_SetupRenderCopy(data, texture, texturedata);
+    METAL_SetupRenderCopy(data, texture, texturedata, 0);
+
+    const float xy[] = {
+        dstrect->x, dstrect->y + dstrect->h,
+        dstrect->x, dstrect->y,
+        dstrect->x + dstrect->w, dstrect->y + dstrect->h,
+        dstrect->x + dstrect->w, dstrect->y
+    };
+
+    const float uv[] = {
+        normtex(srcrect->x, texw), normtex(srcrect->y + srcrect->h, texh),
+        normtex(srcrect->x, texw), normtex(srcrect->y, texh),
+        normtex(srcrect->x + srcrect->w, texw), normtex(srcrect->y + srcrect->h, texh),
+        normtex(srcrect->x + srcrect->w, texw), normtex(srcrect->y, texh)
+    };
+
+    [data.mtlcmdencoder setVertexBytes:xy length:sizeof(xy) atIndex:0];
+    [data.mtlcmdencoder setVertexBytes:uv length:sizeof(uv) atIndex:1];
+    [data.mtlcmdencoder setVertexBuffer:data.mtlbufconstants offset:CONSTANTS_OFFSET_IDENTITY atIndex:3];
+    [data.mtlcmdencoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+
+    return 0;
+}}
+
+static int
+METAL_RenderCopyWithValue(SDL_Renderer * renderer, SDL_Texture * texture,
+              const SDL_Rect * srcrect, const SDL_FRect * dstrect, const float value)
+{ @autoreleasepool {
+    METAL_ActivateRenderCommandEncoder(renderer, MTLLoadActionLoad);
+    METAL_RenderData *data = (__bridge METAL_RenderData *) renderer->driverdata;
+    METAL_TextureData *texturedata = (__bridge METAL_TextureData *)texture->driverdata;
+    const float texw = (float) texturedata.mtltexture.width;
+    const float texh = (float) texturedata.mtltexture.height;
+
+    METAL_SetupRenderCopy(data, texture, texturedata, value);
 
     const float xy[] = {
         dstrect->x, dstrect->y + dstrect->h,
@@ -1289,7 +1420,7 @@ METAL_RenderCopyEx(SDL_Renderer * renderer, SDL_Texture * texture,
     float transform[16];
     float minu, maxu, minv, maxv;
 
-    METAL_SetupRenderCopy(data, texture, texturedata);
+    METAL_SetupRenderCopy(data, texture, texturedata, 0);
 
     minu = normtex(srcrect->x, texw);
     maxu = normtex(srcrect->x + srcrect->w, texw);

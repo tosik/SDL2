@@ -538,6 +538,100 @@ static SDL_ScaleMode SDL_GetScaleMode(void)
 }
 
 SDL_Texture *
+SDL_CreateTextureSpecifiedMetalFragmentShader(SDL_Renderer * renderer, Uint32 format, int access, int w, int h, const char * specifiedFragmentShaderName)
+{
+    SDL_Texture *texture;
+
+    CHECK_RENDERER_MAGIC(renderer, NULL);
+
+    if (!format) {
+        format = renderer->info.texture_formats[0];
+    }
+    if (SDL_BYTESPERPIXEL(format) == 0) {
+        SDL_SetError("Invalid texture format");
+        return NULL;
+    }
+    if (SDL_ISPIXELFORMAT_INDEXED(format)) {
+        SDL_SetError("Palettized textures are not supported");
+        return NULL;
+    }
+    if (w <= 0 || h <= 0) {
+        SDL_SetError("Texture dimensions can't be 0");
+        return NULL;
+    }
+    if ((renderer->info.max_texture_width && w > renderer->info.max_texture_width) ||
+        (renderer->info.max_texture_height && h > renderer->info.max_texture_height)) {
+        SDL_SetError("Texture dimensions are limited to %dx%d", renderer->info.max_texture_width, renderer->info.max_texture_height);
+        return NULL;
+    }
+    texture = (SDL_Texture *) SDL_calloc(1, sizeof(*texture));
+    if (!texture) {
+        SDL_OutOfMemory();
+        return NULL;
+    }
+    texture->magic = &texture_magic;
+    texture->format = format;
+    texture->access = access;
+    texture->w = w;
+    texture->h = h;
+    texture->r = 255;
+    texture->g = 255;
+    texture->b = 255;
+    texture->a = 255;
+    texture->renderer = renderer;
+    texture->next = renderer->textures;
+    if (renderer->textures) {
+        renderer->textures->prev = texture;
+    }
+    renderer->textures = texture;
+
+    if (IsSupportedFormat(renderer, format)) {
+        if (renderer->CreateTextureSpecifiedMetalFragmentShader(renderer, texture, specifiedFragmentShaderName) < 0) {
+            SDL_DestroyTexture(texture);
+            return NULL;
+        }
+    } else {
+        texture->native = SDL_CreateTextureSpecifiedMetalFragmentShader(renderer,
+                                GetClosestSupportedFormat(renderer, format),
+                                access, w, h, specifiedFragmentShaderName);
+        if (!texture->native) {
+            SDL_DestroyTexture(texture);
+            return NULL;
+        }
+
+        /* Swap textures to have texture before texture->native in the list */
+        texture->native->next = texture->next;
+        if (texture->native->next) {
+            texture->native->next->prev = texture->native;
+        }
+        texture->prev = texture->native->prev;
+        if (texture->prev) {
+            texture->prev->next = texture;
+        }
+        texture->native->prev = texture;
+        texture->next = texture->native;
+        renderer->textures = texture;
+
+        if (SDL_ISPIXELFORMAT_FOURCC(texture->format)) {
+            texture->yuv = SDL_SW_CreateYUVTexture(format, w, h);
+            if (!texture->yuv) {
+                SDL_DestroyTexture(texture);
+                return NULL;
+            }
+        } else if (access == SDL_TEXTUREACCESS_STREAMING) {
+            /* The pitch is 4 byte aligned */
+            texture->pitch = (((w * SDL_BYTESPERPIXEL(format)) + 3) & ~3);
+            texture->pixels = SDL_calloc(1, texture->pitch * h);
+            if (!texture->pixels) {
+                SDL_DestroyTexture(texture);
+                return NULL;
+            }
+        }
+    }
+    return texture;
+}
+
+SDL_Texture *
 SDL_CreateTexture(SDL_Renderer * renderer, Uint32 format, int access, int w, int h)
 {
     SDL_Texture *texture;
@@ -1964,6 +2058,58 @@ SDL_RenderCopy(SDL_Renderer * renderer, SDL_Texture * texture,
     return renderer->RenderCopy(renderer, texture, &real_srcrect, &frect);
 }
 
+int
+SDL_RenderCopyWithValue(SDL_Renderer * renderer, SDL_Texture * texture,
+               const SDL_Rect * srcrect, const SDL_Rect * dstrect, const float value)
+{
+    SDL_Rect real_srcrect = { 0, 0, 0, 0 };
+    SDL_Rect real_dstrect = { 0, 0, 0, 0 };
+    SDL_FRect frect;
+
+    CHECK_RENDERER_MAGIC(renderer, -1);
+    CHECK_TEXTURE_MAGIC(texture, -1);
+
+    if (renderer != texture->renderer) {
+        return SDL_SetError("Texture was not created with this renderer");
+    }
+
+    /* Don't draw while we're hidden */
+    if (renderer->hidden) {
+        return 0;
+    }
+
+    real_srcrect.x = 0;
+    real_srcrect.y = 0;
+    real_srcrect.w = texture->w;
+    real_srcrect.h = texture->h;
+    if (srcrect) {
+        if (!SDL_IntersectRect(srcrect, &real_srcrect, &real_srcrect)) {
+            return 0;
+        }
+    }
+
+    SDL_RenderGetViewport(renderer, &real_dstrect);
+    real_dstrect.x = 0;
+    real_dstrect.y = 0;
+    if (dstrect) {
+        if (!SDL_HasIntersection(dstrect, &real_dstrect)) {
+            return 0;
+        }
+        real_dstrect = *dstrect;
+    }
+
+    if (texture->native) {
+        texture = texture->native;
+    }
+
+    frect.x = real_dstrect.x * renderer->scale.x;
+    frect.y = real_dstrect.y * renderer->scale.y;
+    frect.w = real_dstrect.w * renderer->scale.x;
+    frect.h = real_dstrect.h * renderer->scale.y;
+
+    return renderer->RenderCopyWithValue(renderer, texture, &real_srcrect, &frect, value);
+}
+
 
 int
 SDL_RenderCopyEx(SDL_Renderer * renderer, SDL_Texture * texture,
@@ -2288,6 +2434,10 @@ SDL_GetBlendModeAlphaOperation(SDL_BlendMode blendMode)
 {
     blendMode = SDL_GetLongBlendMode(blendMode);
     return (SDL_BlendOperation)(((Uint32)blendMode >> 16) & 0xF);
+}
+
+void SDL_RenderChangeMetalShader(SDL_Renderer * renderer, const unsigned char * shader_metallib, const unsigned int shader_metallib_len) {
+    renderer->ChangeMetalShader(renderer, shader_metallib, shader_metallib_len);
 }
 
 /* vi: set ts=4 sw=4 expandtab: */

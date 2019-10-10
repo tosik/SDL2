@@ -90,6 +90,7 @@ struct SDL_Renderer
     int (*GetOutputSize) (SDL_Renderer * renderer, int *w, int *h);
     SDL_bool (*SupportsBlendMode)(SDL_Renderer * renderer, SDL_BlendMode blendMode);
     int (*CreateTexture) (SDL_Renderer * renderer, SDL_Texture * texture);
+    int (*CreateTextureSpecifiedMetalFragmentShader) (SDL_Renderer * renderer, SDL_Texture * texture, const char  * speficiedFragmentShaderName);
     int (*SetTextureColorMod) (SDL_Renderer * renderer,
                                SDL_Texture * texture);
     int (*SetTextureAlphaMod) (SDL_Renderer * renderer,
@@ -119,12 +120,15 @@ struct SDL_Renderer
                             int count);
     int (*RenderCopy) (SDL_Renderer * renderer, SDL_Texture * texture,
                        const SDL_Rect * srcrect, const SDL_FRect * dstrect);
+    int (*RenderCopyWithValue) (SDL_Renderer * renderer, SDL_Texture * texture,
+                       const SDL_Rect * srcrect, const SDL_FRect * dstrect, const float value);
     int (*RenderCopyEx) (SDL_Renderer * renderer, SDL_Texture * texture,
                        const SDL_Rect * srcquad, const SDL_FRect * dstrect,
                        const double angle, const SDL_FPoint *center, const SDL_RendererFlip flip);
     int (*RenderReadPixels) (SDL_Renderer * renderer, const SDL_Rect * rect,
                              Uint32 format, void * pixels, int pitch);
     void (*RenderPresent) (SDL_Renderer * renderer);
+    void (*ChangeMetalShader) (SDL_Renderer * renderer, const unsigned char * shader_metallib, const unsigned int shader_metallib_len);
     void (*DestroyTexture) (SDL_Renderer * renderer, SDL_Texture * texture);
 
     void (*DestroyRenderer) (SDL_Renderer * renderer);

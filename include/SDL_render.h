@@ -244,6 +244,12 @@ extern DECLSPEC SDL_Texture * SDLCALL SDL_CreateTexture(SDL_Renderer * renderer,
                                                         int access, int w,
                                                         int h);
 
+extern DECLSPEC SDL_Texture * SDLCALL SDL_CreateTextureSpecifiedMetalFragmentShader(SDL_Renderer * renderer,
+                                                        Uint32 format,
+                                                        int access, int w,
+                                                        int h,
+                                                        const char * specifiedFragmentShaderName);
+
 /**
  *  \brief Create a texture from an existing surface.
  *
@@ -812,6 +818,11 @@ extern DECLSPEC int SDLCALL SDL_RenderCopy(SDL_Renderer * renderer,
                                            const SDL_Rect * srcrect,
                                            const SDL_Rect * dstrect);
 
+extern DECLSPEC int SDLCALL SDL_RenderCopyWithValue(SDL_Renderer * renderer,
+                                           SDL_Texture * texture,
+                                           const SDL_Rect * srcrect,
+                                           const SDL_Rect * dstrect, float value);
+
 /**
  *  \brief Copy a portion of the source texture to the current rendering target, rotating it by angle around the given center
  *
@@ -919,6 +930,8 @@ extern DECLSPEC void *SDLCALL SDL_RenderGetMetalLayer(SDL_Renderer * renderer);
  *  \sa SDL_RenderGetMetalLayer()
  */
 extern DECLSPEC void *SDLCALL SDL_RenderGetMetalCommandEncoder(SDL_Renderer * renderer);
+
+extern DECLSPEC void SDLCALL SDL_RenderChangeMetalShader(SDL_Renderer * renderer, const unsigned char * shader_metallib, const unsigned int shader_metallib_len);
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus
